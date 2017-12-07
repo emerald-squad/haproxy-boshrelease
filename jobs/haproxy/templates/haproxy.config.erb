@@ -144,6 +144,10 @@ end
     http-request deny if internal !private
 <% end %>
 
+<% p("ha_proxy.custom_acls").each do |custom_acl| -%>
+    <%= custom_acl %>
+<% end -%>
+
 <% p('ha_proxy.routed_backend_servers').keys.each do |prefix| %>
 <% prefix_hash = (Digest::SHA256.hexdigest prefix.to_s)[0..5] %>
     acl routed_backend_<%= prefix_hash %> path_beg <%= prefix %>
@@ -231,6 +235,10 @@ end
 <% end %>
     http-request deny if internal !private
 <% end %>
+
+<% p("ha_proxy.custom_acls").each do |custom_acl| -%>
+<%= custom_acl %>
+<% end -%>
 
 <% p('ha_proxy.routed_backend_servers').keys.each do |prefix| %>
 <% prefix_hash = (Digest::SHA256.hexdigest prefix.to_s)[0..5] %>
