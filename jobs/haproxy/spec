@@ -33,6 +33,14 @@ consumes:
     optional: true
 
 properties:
+  ha_proxy.custom_acls:
+    description: placefolder for additional ACLs, right before the optional "block everything"
+    default: []
+    example: 
+    - |
+      acl myfriend src 10.0.0.0/8
+      acl mypath path_beg /hidden
+      http-request deny if mypath !myfriend
   ha_proxy.threads:
     description: "Optional number of threads per VM"
     default: 1
