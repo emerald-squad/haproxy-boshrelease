@@ -209,6 +209,15 @@ properties:
       -----BEGIN PRIVATE KEY-----
       ******
       -----END PRIVATE KEY-----
+  ha_proxy.rewrites:
+    description: "allow rewriting request's domain before sending to backend"
+    example:
+      - source: www.google.com                # required rewrite source domain
+        destination: www.mygoogle.com         # required rewrite destination domain
+      - source: cool.name.info
+        destination: www.mycompany.local/cool # supports prefixing the path
+    default: []
+     
   ha_proxy.client_cert:
     description: "Enable haproxy mutual auth and produce a client cert header (X-Forwarded-Client-Cert) to offload mutual ssl client certificate to backend"
     default: false
