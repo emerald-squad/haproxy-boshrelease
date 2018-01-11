@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -e
+#set -x
+
+: ${CONFIG_FILE:?required}
+: ${BLOBS_ROOT:?required}
+
+readonly BLOBS_CONFIG="$(spruce json ${CONFIG_FILE})"
+
+get_property() {
+    local index=$1
+    local property_name=$2
+    echo "$(echo "$BLOBS_CONFIG" | jq -r ".blobs[${index}].${property_name} // \"\"")"
+}
+
+for (( i=0; i<$(echo "$BLOBS_CONFIG" | jq '.blobs|length'); i++ )); do
+    headers_param=''
+    version=$(get_property $i 'version')
+    url=$(get_property $i 'url')
+    headers=$(get_property $i 'headers')
+    dir=$(get_property $i 'dir')
+    binary=$(get_property $i 'binary')
+    if [[ -n "$headers" ]]; then
+      for (( j=0; j<$(echo "$headers" | jq 'length'); j++ )); do
+        headers_param="${headers_param} --header \"$(echo "${headers}" | jq -r ".[${j}]")\""
+      done
+    fi
+    mkdir -p ${BLOBS_ROOT}/${dir}
+    echo "$version" > $BLOBS_ROOT/$dir/version
+    sh -c "wget --show-progress $headers_param -O $BLOBS_ROOT/$dir/$binary $url"
+done

@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+
+: ${CONFIG_FILE:?required}
+: ${REPO_ROOT:?required}
+
+readonly BLOBS_CONFIG="$(spruce json ${CONFIG_FILE})"
+
+get_property() {
+    local index=$1
+    local property_name=$2
+    echo "$(echo "$BLOBS_CONFIG" | jq -r ".blobs[${index}].${property_name}")"
+}
+
+if [[ ! -s $REPO_ROOT/config/blobs.yml ]]; then
+  echo '--- {}' > $REPO_ROOT/config/blobs.yml
+fi
+
+for (( idx=0; idx<$(echo "$BLOBS_CONFIG" | jq '.blobs|length'); idx++ )); do
+    export BLOB_DIR=$(get_property $idx 'dir')
+    export BLOB_NAME=$(get_property $idx 'name')
+    export BLOB_BINARY=$(get_property $idx 'binary')
+    export BLOB_CLEANUP=$(get_property $idx 'cleanup')
+    export BLOB_DESTINATION=$(get_property $idx 'destination')
+    $REPO_ROOT/ci/scripts/update-package
+done
+
+# so that future steps in the pipeline can push our changes
+cp -a ${REPO_ROOT} ${REPO_OUT}

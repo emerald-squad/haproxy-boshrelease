@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -e
+#set -x
+
+: ${BLOBS_ROOT:?required}
+: ${REPO_ROOT:?required}
+: ${CONFIG_FILE:?required}
+
+readonly BLOBS_CONFIG="$(spruce json ${CONFIG_FILE})"
+
+get_property() {
+    local index=$1
+    local property_name=$2
+    echo "$(echo "$BLOBS_CONFIG" | jq -r ".blobs[${index}].${property_name} // \"\"")"
+}
+
+ABS_BLOBS_ROOT="${PWD}/${BLOBS_ROOT}"
+ABS_BLOBSTORE_PATH="${PWD}/${BLOBSTORE_PATH:?required}"
+
+pushd ${REPO_ROOT:?required}
+
+echo '--- {}' > config/blobs.yml
+
+cat <<EOF >config/final.yml
+---
+final_name: artifactory
+blobstore:
+  provider: local
+  options:
+    blobstore_path: ${ABS_BLOBSTORE_PATH}
+EOF
+
+for (( i=0; i<$(echo "$BLOBS_CONFIG" | jq '.blobs|length'); i++ )); do
+    dir=$(get_property $i 'dir')
+    destination=$(get_property $i 'destination')
+    binary=$(get_property $i 'binary')
+    VERSION=$(cat ${ABS_BLOBS_ROOT}/${dir}/version)
+    # expand ${VERSION} env var into file path
+    eval "expanded_destination=${destination}"
+    bosh2 add-blob ${ABS_BLOBS_ROOT}/${dir}/${binary} "${expanded_destination}"
+done
+
+bosh2 -n upload-blobs
+cp config/blobs.yml $ABS_BLOBSTORE_PATH/
+
+popd

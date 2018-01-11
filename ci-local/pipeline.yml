@@ -1,0 +1,99 @@
+---
+resource_types:
+  - name: slack-notification
+    type: docker-image
+    source:
+      repository: cfcommunity/slack-notification-resource
+      tag: latest
+
+resources:
+- name: git-repo
+  type: git
+  source:
+    uri: git@github.com:emerald-squad/haproxy-boshrelease.git
+    branch: dev
+    private_key: {{github-key}}
+
+- name: notify
+  type: slack-notification
+  source:
+    url: {{slack-hook-url}}
+
+- name: version
+  type: semver
+  source :
+    driver: git
+    branch: version
+    file: number
+    initial_version: 1.0.0
+    uri: git@github.com:emerald-squad/haproxy-boshrelease.git
+    private_key: {{github-key}}
+
+- name: github
+  type: github-release
+  source:
+    user: emerald-squad
+    repository: haproxy-boshrelease
+    access_token: {{github-access-token}}
+
+jobs:
+- name: shipit
+  public: true
+  serial: true
+  plan:
+  - name: inputs
+    aggregate:
+    - get: version
+      params: 
+        bump: final
+    - get: git-repo
+  - task: download-blobs
+    file: git-repo/ci-local/tasks/download-blobs.yml
+    params:
+      CONFIG_FILE: git-repo/ci-local/blobs.yml
+      BLOBS_ROOT: blobs
+  - task: init-blobstore
+    file: git-repo/ci-local/tasks/init-blobstore.yml
+    params:
+      BLOBS_ROOT: blobs
+      REPO_ROOT: git-repo
+      CONFIG_FILE: git-repo/ci-local/blobs.yml
+      BLOBSTORE_PATH: blobstore
+  - name: release
+    task: release
+    file: git-repo/ci-local/tasks/release.yml
+    params:
+      REPO_ROOT: git-repo
+      VERSION_FROM: version/number
+      RELEASE_ROOT: gh
+      REPO_OUT: pushme
+      NOTIFICATION_OUT: notifications
+      BRANCH: dev
+      GITHUB_OWNER: emerald-squad
+      BLOBSTORE_PATH: blobstore
+  - name: upload-git
+    put: git-repo
+    params:
+      rebase: true
+      repository: pushme/git-repo
+  - name: github-release
+    put: github
+    params:
+      name:   gh/name
+      tag:    gh/tag
+      body:   gh/notes.md
+      globs: [gh/artifacts/*]
+  - name: version-bump
+    put: version
+    params:
+      bump: patch
+  - name: notify
+    put: notify
+    params:
+      channel: #ci
+      text_file: notifications/message
+  on_failure:
+    put: notify
+    params:
+      channel: #ci
+      text: {{slack-fail-url}}
