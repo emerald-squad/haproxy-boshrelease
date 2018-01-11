@@ -16,4 +16,4 @@ outputs:
   - name: notifications
 
 run:
-  path: git-repo/ci/scripts/shipit
+  path: git-repo/ci-local/scripts/shipit

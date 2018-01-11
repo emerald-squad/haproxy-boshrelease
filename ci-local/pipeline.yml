@@ -49,9 +49,6 @@ jobs:
     - get: git-repo
   - task: download-blobs
     file: git-repo/ci-local/tasks/download-blobs.yml
-    params:
-      CONFIG_FILE: git-repo/ci-local/blobs.yml
-      BLOBS_ROOT: blobs
   - task: init-blobstore
     file: git-repo/ci-local/tasks/init-blobstore.yml
     params:

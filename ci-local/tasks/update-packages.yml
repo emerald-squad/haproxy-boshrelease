@@ -13,4 +13,4 @@ outputs:
   - name: pushme
 
 run:
-  path: git-repo/ci/scripts/update-packages
+  path: git-repo/ci-local/scripts/update-packages

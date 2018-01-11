@@ -11,5 +11,9 @@ inputs:
 outputs:
   - name: blobs
 
+params:
+  CONFIG_FILE: git-repo/ci-local/blobs.yml
+  BLOBS_ROOT: blobs
+
 run:
-  path: git-repo/ci/scripts/download-blobs
+  path: git-repo/ci-local/scripts/download-blobs
