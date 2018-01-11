@@ -1,6 +1,6 @@
 builds:
   ab1231b48830d561c18cade29dcad86c2925fb8c:
     version: ab1231b48830d561c18cade29dcad86c2925fb8c
-    blobstore_id: 39b2c894-7f82-4ba3-400c-41d05aa6597d
-    sha1: fe455a2f526e4162d4ab7fc444d6a10cc819127a
+    blobstore_id: c95809b6-a9a6-4de0-51db-e183bf942df2
+    sha1: caef3872ad39b0be3389953451f2a67fdb421c34
 format-version: "2"
