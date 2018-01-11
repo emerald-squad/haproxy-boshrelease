@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 set -eu
 
 header() {
@@ -25,7 +25,7 @@ fi
 VERSION=$(cat ${VERSION_FROM})
 if [[ -z ${VERSION} ]]; then
   echo >&2 "Version file (${VERSION_FROM}) was empty.  Did you misconfigure Concourse?"
-  exit 2
+  exit 2final_name
 fi
 
 if [[ ! -f ${REPO_ROOT}/ci-local/release_notes.md ]]; then
@@ -48,7 +48,7 @@ git submodule update --init --recursive --force
 
 cat > config/final.yml <<YAML
 ---
-final_name: artifactory
+final_name: haproxy-boshrelease
 blobstore:
   provider: local
   options:
