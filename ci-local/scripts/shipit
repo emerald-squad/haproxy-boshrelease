@@ -48,7 +48,7 @@ git submodule update --init --recursive --force
 
 cat > config/final.yml <<YAML
 ---
-final_name: haproxy-boshrelease
+final_name: haproxy
 blobstore:
   provider: local
   options:

@@ -24,7 +24,7 @@ echo '--- {}' > config/blobs.yml
 
 cat <<EOF >config/final.yml
 ---
-final_name: artifactory
+final_name: haproxy
 blobstore:
   provider: local
   options:
