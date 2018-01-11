@@ -13,4 +13,4 @@ outputs:
   - name: blobstore
 
 run:
-  path: git-repo/ci/scripts/init-blobstore
+  path: git-repo/ci-local/scripts/init-blobstore
