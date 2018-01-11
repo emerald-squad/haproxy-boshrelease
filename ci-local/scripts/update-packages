@@ -23,7 +23,7 @@ for (( idx=0; idx<$(echo "$BLOBS_CONFIG" | jq '.blobs|length'); idx++ )); do
     export BLOB_BINARY=$(get_property $idx 'binary')
     export BLOB_CLEANUP=$(get_property $idx 'cleanup')
     export BLOB_DESTINATION=$(get_property $idx 'destination')
-    $REPO_ROOT/ci/scripts/update-package
+    $REPO_ROOT/ci-local/scripts/update-package
 done
 
 # so that future steps in the pipeline can push our changes

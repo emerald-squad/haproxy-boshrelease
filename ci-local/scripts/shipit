@@ -28,9 +28,10 @@ if [[ -z ${VERSION} ]]; then
   exit 2
 fi
 
-if [[ ! -f ${REPO_ROOT}/ci/release_notes.md ]]; then
-  echo >&2 "ci/release_notes.md not found.  Did you forget to write them?"
-  exit 1
+if [[ ! -f ${REPO_ROOT}/ci-local/release_notes.md ]]; then
+  pushd ${REPO_ROOT}
+    git show > ci-local/release_notes.md
+  popd
 fi
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -69,7 +70,7 @@ mkdir -p ${RELEASE_ROOT}/artifacts
 echo "v${VERSION}"                         > ${RELEASE_ROOT}/tag
 echo "v${VERSION}"                         > ${RELEASE_ROOT}/name
 mv ${REPO_ROOT}/releases/*/*-${VERSION}.tgz  ${RELEASE_ROOT}/artifacts
-mv ${REPO_ROOT}/ci/release_notes.md          ${RELEASE_ROOT}/notes.md
+mv ${REPO_ROOT}/ci-local/release_notes.md          ${RELEASE_ROOT}/notes.md
 cat >> ${RELEASE_ROOT}/notes.md <<EOF
 
 ### Deployment
