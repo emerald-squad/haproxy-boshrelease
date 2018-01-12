@@ -67,6 +67,7 @@ jobs:
       BRANCH: dev
       GITHUB_OWNER: emerald-squad
       BLOBSTORE_PATH: blobstore
+      DOMAIN_URL: {{domain-url}}
   - name: upload-git
     put: git-repo
     params:
