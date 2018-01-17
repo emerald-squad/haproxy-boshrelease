@@ -30,6 +30,6 @@ stemcells:
 
 releases:
 - name: haproxy
-  version: 8.5.2
-  url: https://github.com/emerald-squad/haproxy-boshrelease/releases/download/v8.5.2/haproxy-8.5.2.tgz
-  sha1: 0d1ae891ad627a556096eb0f7b35f875b7ee40ab
+  version: 8.5.3
+  url: https://github.com/emerald-squad/haproxy-boshrelease/releases/download/v8.5.3/haproxy-8.5.3.tgz
+  sha1: 4ce737bc0a91a8b0d056b73db73016b33bc27713
