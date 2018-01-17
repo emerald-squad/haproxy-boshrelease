@@ -10,6 +10,7 @@ resources:
 - name: git-repo
   type: git
   source:
+    branch: master
     uri: git@github.com:emerald-squad/haproxy-boshrelease.git
     private_key: {{github-key}}
 
@@ -64,7 +65,7 @@ jobs:
       RELEASE_ROOT: gh
       REPO_OUT: pushme
       NOTIFICATION_OUT: notifications
-      BRANCH: dev
+      BRANCH: master
       GITHUB_OWNER: emerald-squad
       BLOBSTORE_PATH: blobstore
       DOMAIN_URL: {{domain-url}}
