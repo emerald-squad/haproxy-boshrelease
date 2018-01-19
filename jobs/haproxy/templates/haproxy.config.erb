@@ -166,7 +166,7 @@ end
 <% p("ha_proxy.rewrites").each do |rewrite| -%>
     <% rewrite_hash = (Digest::SHA256.hexdigest rewrite.to_s)[0..5] %>
     acl rewrite_<%= rewrite_hash %>  hdr(host) -i <%= rewrite['source'] %>
-    http-request set-uri http://<%= rewrite['destination'] %>%[path]?%[query] if rewrite_<%= rewrite_hash %>
+    reqirep ^Host: Host:\ <%= rewrite['destination'] %> if rewrite_<%= rewrite_hash %>
 <% end -%>
 
 <% end %>
@@ -256,7 +256,7 @@ end
 <% p("ha_proxy.rewrites").each do |rewrite| -%>
     <% rewrite_hash = (Digest::SHA256.hexdigest rewrite.to_s)[0..5] %>
     acl rewrite_<%= rewrite_hash %>  hdr(host) -i <%= rewrite['source'] %>
-    http-request set-uri https://<%= rewrite['destination'] %>%[path]?%[query] if rewrite_<%= rewrite_hash %>
+    reqirep ^Host: Host:\ <%= rewrite['destination'] %> if rewrite_<%= rewrite_hash %>
 <% end -%>
 <% end %>
 
