@@ -320,8 +320,8 @@ backend http-routers
     end
     %>
 
-    <% if_p("ha_proxy.http_chk") do |http_chk_value| -%>
-    option http_chk <%= http_chk_value %>
+    <% if_p("ha_proxy.httpchk") do |httpchk_value| -%>
+    option httpchk <%= httpchk_value %>
     <% end -%>
     <% backend_servers.each_with_index do |ip, index| -%>
         server node<%= index %> <%= ip %>:<%= backend_port %> <% if_p("ha_proxy.resolvers") do -%>
