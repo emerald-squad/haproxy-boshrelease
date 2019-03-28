@@ -3,4 +3,4 @@ final_name: haproxy
 blobstore:
   provider: local
   options:
-    blobstore_path: /tmp/build/01f561ac/blobstore
+    blobstore_path: /tmp/bstores

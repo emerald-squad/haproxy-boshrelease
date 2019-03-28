@@ -163,11 +163,6 @@ end
     acl ssl_redirect hdr(host),lower,map_end(/var/vcap/jobs/haproxy/config/ssl_redirect.map,false) -m str true
     redirect scheme https code 301 if ssl_redirect
 <% end %>
-<% p("ha_proxy.rewrites").each do |rewrite| -%>
-    <% rewrite_hash = (Digest::SHA256.hexdigest rewrite.to_s)[0..5] %>
-    acl rewrite_<%= rewrite_hash %>  hdr(host) -i <%= rewrite['source'] %>
-    reqirep ^Host: Host:\ <%= rewrite['destination'] %> if rewrite_<%= rewrite_hash %>
-<% end -%>
 
 <% end %>
 
