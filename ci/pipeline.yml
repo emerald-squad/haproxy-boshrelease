@@ -26,6 +26,8 @@ meta:
   image:
     name: starkandwayne/concourse
     tag: latest
+    username: (( param "DockerHub creds are now required to prevent 429s" ))
+    password: (( param "DockerHub creds are now required to prevent 429s" ))
 
   aws:
     bucket:     (( concat meta.pipeline "-pipeline" ))
@@ -60,6 +62,7 @@ groups:
     jobs:
       - testflight
       - testflight-pr
+      - pre
       - rc
       - shipit
       - major
@@ -71,9 +74,10 @@ jobs:
     serial: true
     plan:
     - do:
-      - aggregate:
+      - in_parallel:
         - { get: git, trigger: true }
         - { get: stemcell }
+        - { get: bpm }
       - task: testflight
         privileged: true
         config:
@@ -83,9 +87,12 @@ jobs:
             source:
               repository: (( grab meta.image.bosh ))
               tag:        (( grab meta.image.tag ))
+              username:   (( grab meta.image.username ))
+              password:   (( grab meta.image.password ))
           inputs:
             - { name: git }
             - { name: stemcell }
+            - { name: bpm }
           run:
             path: ./git/ci/scripts/testflight
             args: []
@@ -99,6 +106,7 @@ jobs:
             MANIFEST_VARS:        (( grab meta.manifest.vars ))
             MANIFEST_OP_PATHS:    (( grab meta.manifest.operator_file_paths ))
             stemcell:             ../stemcell/*.tgz
+            bpm_release:          ../bpm/*.tgz
       on_failure:
         put: notify
         params:
@@ -114,6 +122,7 @@ jobs:
     - do:
       - { get: git-pull-requests, trigger: true, version: every }
       - { get: stemcell }
+      - { get: bpm }
       - put: git-pull-requests
         params:
           path: git-pull-requests
@@ -127,9 +136,12 @@ jobs:
             source:
               repository: (( grab meta.image.bosh ))
               tag:        (( grab meta.image.tag ))
+              username:   (( grab meta.image.username ))
+              password:   (( grab meta.image.password ))
           inputs:
             - { name: git-pull-requests }
             - { name: stemcell }
+            - { name: bpm }
           run:
             path: ./git-pull-requests/ci/scripts/testflight
             args: []
@@ -143,6 +155,7 @@ jobs:
             MANIFEST_VARS:        (( grab meta.manifest.vars-pr ))
             MANIFEST_OP_PATHS:    (( grab meta.manifest.operator_file_paths ))
             stemcell:             ../stemcell/*.tgz
+            bpm_release:          ../bpm/*.tgz
         on_success:
           put: git-pull-requests
           params:
@@ -161,6 +174,8 @@ jobs:
             source:
               repository: (( grab meta.image.name ))
               tag:        (( grab meta.image.tag ))
+              username:   (( grab meta.image.username ))
+              password:   (( grab meta.image.password ))
           inputs:
             - { name: git-pull-requests }
           outputs:
@@ -182,13 +197,64 @@ jobs:
           icon_url: (( grab meta.slack.icon ))
           text_file: message/body
 
+  - name: pre
+    public: true
+    serial: true
+    plan:
+    - do:
+      - get: git
+        passed:
+        - testflight
+        trigger: true
+      - get: version
+        trigger: true
+      - task: release-notes
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: (( grab meta.image.name ))
+              tag: (( grab meta.image.tag ))
+              username:   (( grab meta.image.username ))
+              password:   (( grab meta.image.password ))
+          run:
+            path: sh
+            args:
+            - -ce
+            - |
+              cd git
+              if [ -f ci/release_notes.md ]; then
+                echo "######   RELEASE NOTES   ###############"
+                echo
+                cat ci/release_notes.md
+                echo
+                echo "########################################"
+                echo
+              else
+                echo "NO RELEASE NOTES HAVE BEEN WRITTEN"
+                echo "You *might* want to do that before"
+                echo "hitting (+) on that shipit job..."
+                echo
+              fi
+          inputs:
+          - name: git
+      on_failure:
+        put: notify
+        params:
+          channel:  (( grab meta.slack.channel ))
+          username: (( grab meta.slack.username ))
+          icon_url: (( grab meta.slack.icon ))
+          text: release candidate job 'pre' failed (which is unusual).
+          ok: false
+
   - name: rc
     public: true
     plan:
     - do:
-      - aggregate:
-          - { get: git,     trigger: true,  passed: [testflight] }
-          - { get: version, trigger: true, params: {pre: rc} }
+      - in_parallel:
+          - { get: git,     trigger: true,  passed: [pre] }
+          - { get: version, trigger: false, params: {pre: rc} }
       - put: version
         params: {file: version/number}
       on_failure:
@@ -233,7 +299,7 @@ jobs:
     plan:
     - do:
       - name: inputs
-        aggregate:
+        in_parallel:
           - { get: version, passed: [rc], params: {bump: final} }
           - { get: git,     passed: [rc] }
       - name: release
@@ -245,6 +311,8 @@ jobs:
             source:
               repository: (( grab meta.image.name ))
               tag:        (( grab meta.image.tag ))
+              username:   (( grab meta.image.username ))
+              password:   (( grab meta.image.password ))
           inputs:
             - name: version
             - name: git
@@ -288,7 +356,7 @@ jobs:
         params:
           bump: patch
       - name: notify
-        aggregate:
+        in_parallel:
         - put: notify
           params:
             channel:  (( grab meta.slack.channel ))
@@ -308,11 +376,15 @@ resource_types:
     type: docker-image
     source:
       repository: cfcommunity/slack-notification-resource
+      username:   (( grab meta.image.username ))
+      password:   (( grab meta.image.password ))
 
   - name: pull-request
     type: docker-image
     source:
       repository: jtarchie/pr
+      username:   (( grab meta.image.username ))
+      password:   (( grab meta.image.password ))
 
 resources:
   - name: git
@@ -333,7 +405,12 @@ resources:
   - name: stemcell
     type: bosh-io-stemcell
     source:
-      name: bosh-warden-boshlite-ubuntu-trusty-go_agent
+      name: bosh-warden-boshlite-ubuntu-xenial-go_agent
+
+  - name: bpm
+    type: bosh-io-release
+    source:
+      repository: cloudfoundry/bpm-release
 
   - name: version
     type: semver

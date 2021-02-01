@@ -7,6 +7,8 @@ CONF_DIR=${APP_DIR}/config
 RUN_DIR=/var/vcap/sys/run/keepalived
 LOG_DIR=/var/vcap/sys/log/keepalived
 
+source /var/vcap/packages/keepalived/common/utils.sh
+
 interface_for_ip() {
     local ip=$1
     local network=""
@@ -76,6 +78,7 @@ case $1 in
     mkdir -p $RUN_DIR $LOG_DIR
     chown -R vcap:vcap $RUN_DIR $LOG_DIR
 
+    <% if p("keepalived.interface") == "auto" -%>
     interface=$(interface_for_ip <%= p("keepalived.vip") %>)
     if [[ $? != 0 || -z ${interface} ]]; then
         echo "Could not autodetect interface to use for <%= p("keepalived.vip") %>. Cannot continue."
@@ -84,19 +87,28 @@ case $1 in
     if grep "interface auto" ${CONF_DIR}/keepalived.config.template > /dev/null; then
         sed "s/interface auto/interface ${interface}/" ${CONF_DIR}/keepalived.config.template > ${CONF_DIR}/keepalived.config
     fi
+    <% else -%>
+    cp ${CONF_DIR}/keepalived.config.template ${CONF_DIR}/keepalived.config
+    <% end -%>
 
     $SBIN_DIR/keepalived -l -D -n \
         -f $CONF_DIR/keepalived.config \
         --pid=$RUN_DIR/keepalived.pid \
         --vrrp_pid=${RUN_DIR}/vrrp.pid \
-        --checkers_pid=${RUN_DIR}/vrrp.pid \
+        --checkers_pid=${RUN_DIR}/checkers.pid \
         >> ${LOG_DIR}/keepalived.log 2>&1 &
     ;;
 
   stop)
     echo "Stopping keepalived... ($(date))"
     for PIDFILE in ${RUN_DIR}/*.pid; do
-        kill -9 -$(cat $PIDFILE)
+        pid=$(cat $PIDFILE)
+        [[ -z "${pid}" ]] && continue
+        kill "${pid}"
+        wait_pid_death "${pid}" 25
+        if pid_is_running "${pid}"; then
+            kill -9 ${pid}
+        fi
         rm -f $PIDFILE
     done
 

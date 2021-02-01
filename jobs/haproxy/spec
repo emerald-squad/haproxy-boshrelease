@@ -8,20 +8,22 @@ packages:
 - ttar
 
 templates:
-  haproxy.config.erb:         config/haproxy.config
-  haproxy_ctl:                bin/haproxy_ctl
-  monit_debugger:             bin/monit_debugger
-  certs.ttar.erb:             config/certs.ttar
-  ssl_redirect.map.erb:       config/ssl_redirect.map
-  backend-ca-certs.erb:       config/backend-ca-certs.pem
-  client-ca-certs.erb:        config/client-ca-certs.pem
-  backend-crt.erb:            config/backend-crt.pem
-  client-revocation-list.erb: config/client-revocation-list.pem
-  helpers/ctl_setup.sh:       helpers/ctl_setup.sh
-  helpers/ctl_utils.sh:       helpers/ctl_utils.sh
-  properties.sh.erb:          data/properties.sh
-  blacklist_cidrs.txt.erb:    config/blacklist_cidrs.txt
-  whitelist_cidrs.txt.erb:    config/whitelist_cidrs.txt
+  haproxy_wrapper.erb:          bin/haproxy_wrapper
+  reload:                       bin/reload
+  drain.erb:                    bin/drain
+  pre-start.erb:                bin/pre-start
+  bpm.yml:                      config/bpm.yml
+  haproxy.config.erb:           config/haproxy.config
+  certs.ttar.erb:               config/certs.ttar
+  cidrs.ttar.erb:               config/cidrs.ttar
+  ssl_redirect.map.erb:         config/ssl_redirect.map
+  backend-ca-certs.erb:         config/backend-ca-certs.pem
+  client-ca-certs.erb:          config/client-ca-certs.pem
+  backend-crt.erb:              config/backend-crt.pem
+  client-revocation-list.erb:   config/client-revocation-list.pem
+  blacklist_cidrs.txt.erb:      config/blacklist_cidrs.txt
+  whitelist_cidrs.txt.erb:      config/whitelist_cidrs.txt
+  trusted_domain_cidrs.txt.erb: config/trusted_domain_cidrs.txt
 
 consumes:
   - name: http_backend
@@ -30,6 +32,10 @@ consumes:
 
   - name: tcp_backend
     type: ssh_proxy
+    optional: true
+
+  - name: tcp_router
+    type: tcp-router
     optional: true
 
 properties:
@@ -41,18 +47,29 @@ properties:
       acl myfriend src 10.0.0.0/8
       acl mypath path_beg /hidden
       http-request deny if mypath !myfriend
-  ha_proxy.threads:
-    description: "Optional number of threads per VM"
+  ha_proxy.nbproc:
+    description: "Optional number of processes per VM"
+    default: 1
+  ha_proxy.nbthread:
+    description: "Optional number of threads per VM (EXPERIMENTAL)"
     default: 1
   ha_proxy.syslog_server:
     description: "An IPv4 address optionally followed by a colon and a UDP port. It can also be an IPv6 address or filesystem path to a UNIX domain socket."
-    default: "127.0.0.1"
+    default: "stdout"
+  ha_proxy.log_max_length:
+    description: "Optional maximum line length. Log lines larger than this value will be truncated before being sent."
+    default: 1024
+  ha_proxy.log_format:
+    description: "The log format used when generating syslog messages."
+    default: "raw"
   ha_proxy.log_level:
     description: "Log level"
     default: "info"
   ha_proxy.buffer_size_bytes:
     description: "Buffer size to use for requests, any requests larger than this (large cookies or query strings) will result in a gateway error"
     default: 16384
+  ha_proxy.max_rewrite:
+    description: "Buffer size to use for header rewriting or appending. The default of haproxy is min(1024,buffer_size_bytes/2). Will be set to buffer_size_bytes/2 by haproxy if it is set to a larger value"
   ha_proxy.internal_only_domains:
     description: "Array of domains for internal-only apps/services (not hostnames for the apps/services)"
     default: []
@@ -84,15 +101,86 @@ properties:
         -----BEGIN RSA PRIVATE KEY-----
         -----END RSA PRIVATE KEY-----
     default: ~
+  ha_proxy.crt_list:
+    description: |
+      Array of private keys and certificates used for TLS handshakes with downstream clients. Each element in the array is an object containing at least the field 'ssl_pem'.
+      The field 'ssl_pem' itself is either an object containing fields 'cert_chain' and 'private_key', or a single string containing the cert chain and the private key.
+      The following fields are optional:
+      - 'client_ca_file' (replaces ha_proxy.client_ca_file)
+      - 'verify' (allowed values: [none|optional|required])
+      - 'ssl_ciphers' (overrides ha_proxy.ssl_ciphers)
+      - 'client_revocation_list' (replaces ha_proxy.client_revocation_list)
+      - 'snifilter' (either a string or an array of strings)
+      The global option ha_proxy.client_cert has to be set to 'true', if there are crt_list entries with mutual auth configuration ('client_ca_file', 'client_revocation_list' and 'verify'!='none')
+      To avoid confusing configurations, it's not allowed to specify 'client_ca_file' and 'client_revocation_list' both globally AND in crt_list entries.
+    example:
+      crt_list:
+      - ssl_pem: |
+          -----BEGIN CERTIFICATE-----
+          -----END CERTIFICATE-----
+          -----BEGIN CERTIFICATE-----
+          -----END CERTIFICATE-----
+          -----BEGIN RSA PRIVATE KEY-----
+          -----END RSA PRIVATE KEY-----
+      - ssl_pem:
+          cert_chain: |
+            -----BEGIN CERTIFICATE-----
+            -----END CERTIFICATE-----
+            -----BEGIN CERTIFICATE-----
+            -----END CERTIFICATE-----
+          private_key: |
+            -----BEGIN RSA PRIVATE KEY-----
+            -----END RSA PRIVATE KEY-----
+        client_ca_file: |
+          -----BEGIN CERTIFICATE-----
+          -----END CERTIFICATE-----
+          -----BEGIN CERTIFICATE-----
+          -----END CERTIFICATE-----
+        verify: required
+        ssl_ciphers: AES:ALL:!aNULL:!eNULL:+RC4:@STRENGTH
+        client_revocation_list: |
+          -----BEGIN X509 CRL-----
+          -----END X509 CRL-----
+          -----BEGIN X509 CRL-----
+          -----END X509 CRL-----
+        snifilter:
+        - "*.domain.tld"
+        - "!secure.domain.tld"
+    default: ~
+  ha_proxy.ext_crt_list:
+    description: |
+      A flag denoting the use of additional certificates from external sources.
+      If set to true the contents of an external crt-list file located at `ha_proxy.ext_crt_list_file` are
+      added to the crt-list described by the `ha_proxy.crt_list` property.
+    default: false
+  ha_proxy.ext_crt_list_file:
+    description: |
+      The location from which to load additional external certificates list
+    default: "/var/vcap/jobs/haproxy/config/ssl/ext/crt-list"
+  ha_proxy.ext_crt_list_timeout:
+    description: |
+      Timeout (in seconds) to wait for the external certificates list located at `ha_proxy.ext_crt_list_file` to appear during HAproxy startup
+    default: 60
+  ha_proxy.ext_crt_list_policy:
+    description: |
+      What to do if the external certificates list located at `ha_proxy.ext_crt_list_file` does not appear within the time
+      denoted by `ha_proxy.ext_crt_list_timeout`. Set to either 'fail' (HAproxy will not start) or 'continue' (HAproxy will start without external certificates)
+    default: "fail"
   ha_proxy.backend_ca_file:
     description: "Optional SSL CA certificate chain (PEM file) concatenated together for backend SSL servers, only used when one of the `backend_ssl` options is set to `verify`"
   ha_proxy.enable_health_check_http:
     description: "Optionally enable http health-check on `haproxy_ip:8080/health`. It shows `200 OK` if >0 backend servers are up."
     default: false
+<<<<<<< HEAD
   ha_proxy.httpchk:
     description: "option httpchk with value if defined"
     example:
       httpchk: "OPTIONS * HTTP/1.1\r\nHost:\ www"
+=======
+  ha_proxy.health_check_port:
+    description: "port for http health-check"
+    default: 8080
+>>>>>>> upstream/master
   ha_proxy.disable_http:
     description: "Disable port 80 traffic"
     default: false
@@ -147,7 +235,7 @@ properties:
     default:     3600
   ha_proxy.keepalive_timeout:
     description: "Timeout (in floating point seconds) applied to any connection that is in an http-keepalive state, waiting for the next request to occur"
-    default:     0.5
+    default:     6
   ha_proxy.request_timeout:
     description: "Timeout (in floating point seconds) applied to any connection to limit the maximum time for a complete HTTP request (headers only). Used to limit DoS attacks that send data slowly to not trigger the client/server timeouts"
     default:     5
@@ -198,6 +286,10 @@ properties:
                                  # Setting `verify` requires `ha_proxy.backend_ca_file` key to be set.
           backend_verifyhost: example.com # optional - hostname to verify in the x509 certificate subject for SSL-enabled backend servers
                                           # only used if backend_ssl: `verify` is set
+          backend_use_http_health:  true    # optional, defaults to false. enables http based health checks for the backend
+          backend_http_health_port: 80      # optional, defaults to the port of the backend server. sets the port for the http backend health check
+          backend_http_health_uri:  /health # optional, defaults to /health. sets the URI for backend http health checks
+
   ha_proxy.headers:
     description: "Hash of custom headers you wish you have set on each request. Spaces are automatically escaped, but any other haproxy delimiters will need to be escaped manually"
     example: |
@@ -233,6 +325,24 @@ properties:
   ha_proxy.client_cert:
     description: "Enable haproxy mutual auth and produce a client cert header (X-Forwarded-Client-Cert) to offload mutual ssl client certificate to backend"
     default: false
+
+  ha_proxy.forwarded_client_cert:
+    description: |
+      This option lets you decide how to handle the X-Forwarded-Client-Cert (XFCC) http header on any https frontend.
+      On http frontends the `always_forward_only` option is active by default and can't be changed.
+      On https frontends your options are (ordered from least to most secure):
+      - always_forward_only:
+          Least secure option. Always forward the XFCC header in the request, regardless of whether the client connection is mTLS.
+          Use this value when your load balancer is forwarding the client certificate and requests are not forwarded to HAProxy over mTLS.
+          In the case where the connection between load balancer and HAProxy is mTLS, the client certificate received by HAProxy in the mTLS handshake will not be forwarded.
+      - forward_only:
+          Secure version of `always_forward_only`. Forward the XFCC header received from the client only when the client connection is mTLS.
+          The client certificate received by HAProxy in the mTLS handshake will not be forwarded.
+      - sanitize_set:
+          Most secure option. Strip any instances of XFCC headers from the client request.
+          When the client connection is mTLS, the client certificate received by HAProxy in the mTLS handshake will be forwarded in this header.
+          Values will be base64 encoded PEM. Use this value when HAProxy is the first component to terminate TLS.
+    default: sanitize_set
 
   ha_proxy.client_ca_file:
     description: "path for CA certs to validate client certificate"
@@ -278,17 +388,29 @@ properties:
     description: "List of DNS servers"
     example:
       resolvers:
-        private: 10.0.0.2
-        public: 8.8.8.8
+      - private: 10.0.0.2
+      - public: 8.8.8.8
   ha_proxy.dns_hold:
     description: "DNS Hold time"
     default: 10s
+  ha_proxy.resolve_retry_timeout:
+    description: "Timeouts related to resolver name resolution"
+    default: 1s
+  ha_proxy.resolve_retries:
+    description: "Number of dns queries to send to resolve a server name before giving up"
+    default: 3
   ha_proxy.accept_proxy:
-    description: "Turned off by default. Enforces the use of the PROXY protocol for all incoming connections to SSL-enabled frontends such as https on port 443, websockets on port 4443 and all additional ssl frontends defined in ha_proxy.tcp. When enabled standard tcp connections to these port no longer work."
+    description: "Turned off by default. Enforces the use of the PROXY protocol for all incoming connections to all frontends. When enabled standard tcp connections to these port no longer work."
+    default: false
+  ha_proxy.disable_tcp_accept_proxy:
+    description: "Disables the PROXY protocol on tcp backends. Only applies if `ha_proxy.accept_proxy` is enabled."
     default: false
   ha_proxy.binding_ip:
-    description: "If there are multiple ethernet interfaces, specify which one to bind"
+    description: "If there are multiple ethernet interfaces, specify which one to bind. Set to `::` to bind to all IPv6 interfaces (no IPv4). IPv6 must be enabled on the HAProxy VM in the deployment manifest."
     default: ""
+  ha_proxy.v4v6:
+    description: "Boolean, disabled by default. Enables binding to all IPv4 and IPv6 interfaces. Only applies if `ha_proxy.binding_ip` is set to `::`."
+    default: false
 
   ha_proxy.cidr_blacklist:
     description: "List of CIDRs to block for http(s). Format is string array of CIDRs or single string of base64 encoded gzip."
@@ -306,4 +428,120 @@ properties:
       - 10.2.0.0/16
   ha_proxy.block_all:
     description: "Optionally block all incoming traffic to http(s). Use in conjunction with whitelist."
+    default: false
+
+  ha_proxy.tcp_routing.port_range:
+    description: "A range of ports for haproxy to listen on to enable CF TCP Routing. Used only if 'tcp_router' link is present."
+    default: 1024-1123
+
+  ha_proxy.http_request_deny_conditions:
+      description: |
+        List of conditions to block http requests. Each condition consists of multiple rules combined with the AND operator. Setting
+        the negate flag to true will negate the acl condition.
+
+      example:
+        http_request_deny_conditions:
+        - condition:
+          - acl_name: block_host
+            acl_rule: "hdr_beg(host) -i login"
+          - acl_name: block_reset_password_url
+            acl_rule: "path_beg,url_dec -m beg -i /reset_password"
+          - acl_name: whitelist_ips
+            acl_rule: "src 5.22.5.11 5.22.5.12"
+            negate: true
+
+
+  ha_proxy.cidrs_in_file:
+    description: |
+      List of cidrs that will be placed in /var/vcap/jobs/haproxy/config/cidrs/<name>. Useful for acl's that reference
+      a long list of cidrs (invoke the file with -f /var/vcap/jobs/haproxy/config/cidrs/<name>).
+
+    example:
+      cidrs_in_file:
+      - name: sample_cidrs
+        cidrs:
+        - 5.22.1.3
+        - 5.22.12.3
+
+  ha_proxy.lua_scripts:
+    description: |
+      A list of LUA scripts that HA Proxy should load. These will need to be provided
+      by other boshreleases, as none are supplied in `haproxy_boshrelease`. Specify
+      each script with the full path to the script (likely `/var/vcap/packages/something/something/darkside.lua`)
+    default: []
+
+  ha_proxy.additional_unrestricted_volumes:
+    description: |
+      Map of Additional Unrestricted volumes to added so HA Proxy to give the ability to load external volumes under BPM. These will need to be provided
+      in a Map based on bpm unrestricted volume spec
+    default: ~
+
+
+  ha_proxy.backend_use_http_health:
+    description: |
+      Enables HTTP based health checks for the default backend
+    default: false
+  ha_proxy.backend_http_health_uri:
+    description: URI to request when checking the health of a backend
+    default: /health
+  ha_proxy.backend_http_health_port:
+    description: Port to check the backend health on
+    default: 8080
+
+  ha_proxy.global_config:
+    description: |
+      A block of raw HAProxy config that will be added to the HA proxy global section
+
+  ha_proxy.default_config:
+    description: |
+      A block of raw HAProxy config that will be added to the HA proxy default section
+
+  ha_proxy.frontend_config:
+    description: |
+      A block of raw HAProxy config that will be added to each HA proxy frontend definition
+
+  ha_proxy.backend_config:
+    description: |
+      A block of raw HAProxy config that will be added to the default HTTP + routed HTTP backend definitions
+
+  ha_proxy.custom_http_error_files:
+    description: |
+      A map of status codes to errorfile contents
+    default:
+      "503": |
+               HTTP/1.1 503 Service Unavailable
+               Cache-Control: no-cache
+               Connection: close
+               Content-Type: text/html
+
+               <html><body><h1>503 Service Unavailable</h1>
+               No server is available to handle this request.
+               </body></html>
+  ha_proxy.tcp_backend_config:
+    description: |
+      A block of raw HAProxy config that will be added to the CF TCP Router + Generic TCP backend definitions
+
+  ha_proxy.raw_config:
+    description: |
+      A multiline text blob of an entire haproxy config. Overrides every other
+      option available, so you can provide your own config, and do whatever
+      you want. Use at your own risk.
+  ha_proxy.max_open_files:
+    description: The number of file descriptors HAProxy can have open at one time
+    default: 256000
+  ha_proxy.max_connections:
+    description: Number of simultanous connections HAProxy supports handling
+    default: 64000
+  ha_proxy.drain_enable:
+    description: Send SIGUSR1 signal to all haproxy processes in a drain script in order to gracefully shutdown
+    default: false
+  ha_proxy.drain_timeout:
+    description: Time in seconds after SIGUSR1 signal is sent in the drain script until monit stops the processes
+    default: 30
+  ha_proxy.drain_frontend_grace_time:
+    description: Time in seconds after SIGUSR1 signal is sent in the drain script until the frontends stop accepting connections
+    default: 0
+  ha_proxy.backend_prefer_local_az:
+    description: |
+      Prefer backend servers which are located on the same availability zone
     default: false
