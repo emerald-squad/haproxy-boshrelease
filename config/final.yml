@@ -1,6 +1,6 @@
 ---
 final_name: haproxy
 blobstore:
-  provider: local
   options:
-    blobstore_path: /tmp/bstores
+    access_key_id: cfzceaartifacts
+    secret_access_key: 9HVrEOUvFPHL814iIMTE9aGdcZ5nrsKnPRsan8zAlTT8FziLR1zbIXwwbHZetZtK/Vq9JnMf6BOnlu1JRfnCmw== 
