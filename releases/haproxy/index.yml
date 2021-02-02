@@ -9,6 +9,8 @@ builds:
     version: 8.0.10
   24fa66cb-3141-45e7-9dc0-84c9067582d5:
     version: 8.2.0
+  2a8ea978-76ca-46a0-7ef7-e6ef62c28405:
+    version: 10.2.0
   2c765105-da0a-4e82-8db5-0e95805af095:
     version: 8.1.0
   3803d9f8-6df8-4eaf-5d83-280b2aae39ab:
@@ -23,8 +25,6 @@ builds:
     version: 8.0.4
   53d69e13-909b-42da-56c6-6abb3b9e6203:
     version: 9.1.0
-  57c1a560-39f1-47bb-5f81-5d92e09580c2:
-    version: 10.2.0
   67641731-8395-4522-827d-0699dc8e7a1e:
     version: "4"
   678db2df-6efc-4281-bd7e-9ad1527c0043:

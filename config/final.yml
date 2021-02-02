@@ -1,6 +1,6 @@
 ---
-final_name: haproxy
 blobstore:
+  provider: s3
   options:
-    access_key_id: cfzceaartifacts
-    secret_access_key: 9HVrEOUvFPHL814iIMTE9aGdcZ5nrsKnPRsan8zAlTT8FziLR1zbIXwwbHZetZtK/Vq9JnMf6BOnlu1JRfnCmw== 
+    bucket_name: cf-haproxy-boshrelease # leaving as old release name for blob compatibility
+final_name: haproxy
