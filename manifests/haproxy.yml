@@ -42,4 +42,4 @@ releases:
 - name: haproxy
   version: 10.2.0
   url: https://github.com/emerald-squad/haproxy-boshrelease/releases/download/v10.2.0/haproxy-10.2.0.tgz
-  sha1: 0c56617383db2cd84ae015ecfcae65618c3b3113
+  sha1: afc25f5e342806099425c352aa26cf4b6bb772c4
