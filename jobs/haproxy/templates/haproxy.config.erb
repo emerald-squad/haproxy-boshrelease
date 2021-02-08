@@ -363,12 +363,12 @@ frontend https-in
   use_backend http-routed-backend-<%= prefix_hash %> if routed_backend_<%= prefix_hash %>
 <% end %>
     acl xfp_exists hdr_cnt(X-Forwarded-Proto) gt 0
-    reqadd X-Forwarded-Proto:\ https if ! xfp_exists
+    http-request add-header X-Forwarded-Proto https if ! xfp_exists
 
 <% p("ha_proxy.rewrites").each do |rewrite| -%>
     <% rewrite_hash = (Digest::SHA256.hexdigest rewrite.to_s)[0..5] %>
     acl rewrite_<%= rewrite_hash %>  hdr(host) -i <%= rewrite['source'] %>
-    reqirep ^Host: Host:\ <%= rewrite['destination'] %> if rewrite_<%= rewrite_hash %>
+    http-request set-header Host  <%= rewrite['destination'] %> if rewrite_<%= rewrite_hash %>
 <% end -%>
 <% end %>
 
@@ -464,6 +464,11 @@ backend http-routers
     <%- p('ha_proxy.custom_http_error_files', {}).keys.each do |status_code| -%>
         errorfile <%= status_code %> /var/vcap/jobs/haproxy/errorfiles/custom<%=status_code%>.http
     <%- end -%>
+    <% p("ha_proxy.rewrites").each do |rewrite| -%>
+      <% rewrite_hash = (Digest::SHA256.hexdigest rewrite.to_s)[0..5] %>
+      acl rewrite_<%= rewrite_hash %>  hdr(host) -i <%= rewrite['source'] %>
+      http-request set-header Host  <%= rewrite['destination'] %> if rewrite_<%= rewrite_hash %>
+  <% end -%>
     <%
   backend_servers = []
   backend_servers_local = []
@@ -641,3 +646,4 @@ listen health_check_http_tcp-<%= tcp_proxy["name"] %>
 
 # }}}
 <% end -%>
+
